@@ -31,7 +31,11 @@ Lebendes Logbuch. Neueste Einträge oben.
 
 **Offene Punkte**
 
-- [ ] Render-Deployment einrichten (`render.yaml` liegt bereit)
+- [x] **Live unter https://ptn-vergleich.onrender.com** (2026-08-17).
+      Fachlich geprüft: zwei Modelle gegen eine PT3-Referenzmessung ergeben
+      Fehlerintegral 0,000 (passend) und 2,309 (falsche Ordnung), Rangfolge
+      korrekt. Erreichbarkeit 15/15. Karte in der HdT-Oberfläche
+      freigeschaltet.
 - [ ] Projektdatei **schreiben** in der Oberfläche anbinden
       (Server-Route `/api/projekt_xlsx` existiert)
 - [ ] Vergleich alte ./. neue App mit echten Teilnehmerdateien durch den Nutzer
