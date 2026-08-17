@@ -1,0 +1,230 @@
+\documentclass[main.tex]{subfiles}
+\begin{document}
+\graphicspath{{Images/I2f16/}} % Pfad zu deinem Ordner angeben – Duplikat aus Zeile 3 entfernt, Pfad I2f16 beibehalten
+
+\chapter{Spec Dokument zur Erstellung der PTn-App}
+\textbf{Version 1-5, 10.04.2026, 13:45}
+
+\begin{small}
+\textit{%
+Revision 1.1 (03.04.2026, A. Gr.\ – automatische Überprüfung):
+Mathematischen Fehler in Gleichung~\ref{eq:Ynorm} behoben
+($t+t_0 \rightarrow t-t_0$ im Exponenten;
+Bezeichnung $T$ vereinheitlicht zu $T_S$);
+doppeltes \texttt{\textbackslash tableofcontents} entfernt;
+widersprüchliches doppeltes \texttt{\textbackslash graphicspath} bereinigt;
+führenden Schrägstrich im Bildpfad entfernt;
+\texttt{\textbackslash\textbackslash} aus \texttt{equation}-Umgebungen entfernt
+und Bedingungstext mit \texttt{\textbackslash text\{\}} korrigiert;
+$t0 \rightarrow t_0$ im Mathemodus;
+Leerzeichen aus Label-Namen entfernt;
+Unklarheit bei parallelen Variablenumbenennungen (XA/YA/UA) klargestellt;
+Tippfehler korrigiert (Überschrift, Bildschirms, ersetzt, eingegebenen,
+das, Zeitwerte, eingelesen, und, Klickfelder);
+unerreichbaren Template-Code nach \texttt{\textbackslash end\{document\}} entfernt.
+}
+\end{small}
+
+\tableofcontents  % doppeltes \tableofcontents entfernt
+
+\chapter{Spezifikation für ein Programm zum Vergleich mehrerer PTn-Systeme}
+\section{Zielsetzung}
+Ausgehend von der App $PT1TT\text{-}Vergleich$ soll eine App erstellt werden, die bis zu 4 Parametersätze von PTn-Systemen einliest, einen Excel-File einliest und aus den Eingabedaten die Sprungantwort des jeweiligen $PT_n$-Systems berechnet und darstellt.
+Die Darstellung kann die $PT_n$-Modelle allein oder zusammen mit den eingelesenen Excel-Daten erfolgen.
+Es werden $PT_n$-Systeme bis zur Ordnung $n=10$ betrachtet.
+Das folgende Bild \ref{fig:PT1TT-Vergleich} zeigt das Layout zum Vergleich der Sprungantwort mehrerer PT1TT-Systeme. Im folgenden werden Änderungen im Layout zu diesem Layout spezifiziert.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[angle=0,width=0.9\linewidth]{PT1TT-Vergleich-Layout.pdf}  % führenden Schrägstrich entfernt
+    \caption{PT1TT-Vergleich Layout}
+    \label{fig:PT1TT-Vergleich}
+\end{figure}
+
+\section{Schritt 1 – Spec-Dokument vor dem ersten Prompt erstellen}
+\label{sec:Schritt1}
+Dieses Spec-Dokument beschreibt die Aufgabe, die notwendigen Berechnungen und Änderungen, um von PT1TT-Vergleich zu der neuen App PTn-Vergleich zu kommen.
+\newpage
+
+\section{Schritt 2 – Erster Prompt: nur Kopie und Umbenennung}
+\label{sec:Schritt2}  % Leerzeichen aus Label entfernt
+Ich habe ein neues Verzeichnis erstellt,
+\begin{verbatim}
+ dropbox/1_a_a_Webapp/PTn-Vergleiche
+\end{verbatim}
+und alle Programme und Routinen aus PT1TT-Vergleich hierhin kopiert.\\
+
+Bitte erstelle ein Git und committe vor jeder weiteren Änderung die Files in diesem neuen Verzeichnis.\\
+Bitte nenne alle Bezüge von PT1TT-Vergleich, die für die neue App von Bedeutung sind, um in PTn-Vergleich.\\
+Jetzt sollte in VSC im Terminal \texttt{npm run dev} dazu führen, dass die Webseite im Browser öffnet.\\
+Bitte melde dich, sobald du das hast, damit ich überprüfen kann, ob aus diesem Verzeichnis heraus noch alles richtig arbeitet.
+
+
+
+\section{Schritt 3 – Veränderungen im Diagramm-Layout}
+\label{sec:Schritt3}  % Leerzeichen aus Label entfernt
+Die Überschrift über dem linken Teil des Bildschirms, in dem die Daten der PTn-Systeme  % Tippfehler "Überrschrift" und "Bildscjhirms" korrigiert
+eingegeben werden, soll PTn-System-Vergleich lauten.\\
+
+\subsection{Änderung der Eingabenamen}
+Die Namen der Eingabesignale sollen umgeändert werden auf die in der Regelungstechnik meist verwendeten Namen. Bitte führe folgende Ersetzungen durch, auch im Programmcode.
+
+\textbf{Hinweis:} Die nachfolgenden drei Umbenennungen sind \emph{parallel} gemeint,
+d.\,h.\ jede alte Bezeichnung wird unabhängig von den anderen durch die neue ersetzt.
+Es handelt sich \emph{nicht} um eine sequentielle (verkettete) Substitution:
+\begin{itemize}
+    \item XA (alter Name) wird ersetzt durch YA (neuer Name für den Ausgangs-Anfangswert)
+    \item YA (alter Name, eine andere Größe) wird ersetzt durch UA (neuer Name für den Eingangs-Anfangswert)
+    \item DY wird ersetzt durch DU  % Tippfehler "ersetzut" korrigiert
+\end{itemize}
+Erhalten bleibt in Benennung und Bedeutung $t_0$.
+
+\subsection{Änderungen bei den Eingaben}
+Ab hier nutze ich die neuen Namen der Eingabedaten.
+Die Daten YA, UA, $t_0$, DU werden in der neuen App PTn-Vergleiche für jedes System getrennt benötigt. Sie sollen also für jedes System 1 bis System 4 eingegeben werden können.\\
+Die je System eingegebenen Werte sind also:  % Tippfehler "eingegbenen" korrigiert
+\begin{itemize}
+    \item Tickbox \quad Systemname
+    \item YA, $t_0$, UA, DU
+\end{itemize}
+% Rev. 1-3
+Für die Berechnung der Sprungantwort spielt UA keine Rolle. UA und UE=UA+DU werden nur bei der Darstellung der Stellgröße im unteren Diagramm genutzt. Bei 4 verschiedenen Werten von UA würden auch 4 verschiedene Verläufe im unteren Diagramm entstehen.\\
+Die bisherigen Daten, die das System beschreiben — kS, TT, TG — werden ersetzt.\\
+Die neuen Daten sind kS, n, TS.\\
+Die Texte, die erscheinen, wenn der Cursor über dem Eingabefeld positioniert wird, sind:\\
+für das Feld n: Systemordnung. Werte von 1–10 sind für n zulässig.\\
+für das Feld TS: Zeitkonstante, $T_S > 0$  % Tippfehler "deas" korrigiert
+
+Diese Datenstruktur gilt für alle 4 Systeme.
+Die Liste der Eingabedaten für die 4 Systeme ist also:
+\begin{enumerate} % Rev. 1.3, Endwert sauber angegeben mit $YSQ_{Sum}
+    \item System 1: Systemname 1, $t_{01}$, YA1, UA1, DU1, kS1, n1, TS1
+    \item System 2: Systemname 2, $t_{02}$, YA2, UA2, DU2, kS2, n2, TS2
+    \item System 3: Systemname 3, $t_{03}$, YA3, UA3, DU3, kS3, n3, TS3
+    \item System 4: Systemname 4, $t_{04}$, YA4, UA4, DU4, kS4, n4, TS4
+\end{enumerate} % \Rev. 1-4 Liste um fälschlicherweise angegeben Ausgabedaten bereinigt.
+Du kannst auch indizierte Felder für die Datenstruktur nehmen.
+Dann würden die Daten so angesprochen:
+
+System($i$); Systemname($i$); $t_0(i)$; YA($i$); UA($i$); DU($i$); kS($i$); $n(i)$; TS($i$)\\
+$1 \le n \le 10$
+
+Die Zeilen:\\
+Messdaten laden, das Klickfeld Messdaten anzeigen und das Feld Datei laden und die Ausgabe des Dateinamens bleiben bestehen.\\
+Die Ausgabe der Dateiinhalte entfällt.
+
+Erweiterung der Ausgabe:\\
+Unterhalb der Zeile „Datei laden" soll ein Klickfeld eingebaut werden. Wenn dieses Feld angeklickt ist, sollen auf einer weiteren Ausgabeseite die Eingabedaten und Ergebnisse weiterer Berechnungen dargestellt werden.\\
+Spezifikation der Seite erfolgt in Section \ref{sec:Schritt6}.  % Label-Referenz angepasst (kein Leerzeichen)
+
+\section{Schritt 4 – Veränderungen in der Mathematik}
+\label{sec:Schritt4}  % Leerzeichen aus Label entfernt
+Die Berechnung der Sprungantwort der Systeme System 1 bis System 4 erfolgt für ein PTn-System. Diese Berechnung ersetzt die Berechnung der Sprungantwort der bisher vorgegebenen PT1TT-Systeme.\\
+Die Modellantwort hängt von den eingegebenen Daten der jeweiligen Systeme ab.\\
+
+Es gilt:
+\begin{equation}
+    1 \leq n \leq 10
+\end{equation}
+
+\begin{equation}
+    Y_{\text{norm}}(t) = 0 \quad \text{für } t \le t_0
+    % \\ entfernt (ungültig in equation-Umgebung); t0 zu t_0 korrigiert
+\end{equation}
+
+\begin{equation}
+    Y_{\text{norm}}(t) = 1 - e^{-\frac{t - t_0}{T_S}} \cdot \sum_{i=0}^{n-1} \frac{1}{i!} \left(\frac{t - t_0}{T_S}\right)^{i}
+    \quad \text{für } t > t_0
+    % FEHLERKORREKTUR: t+t0 -> t-t0 im Exponenten (war physikalisch falsch)
+    % T vereinheitlicht zu T_S (Übereinstimmung mit Eingabeparameter TS)
+    % \\ entfernt; Bedingungstext mit \text{} korrekt gesetzt
+    \label{eq:Ynorm}
+\end{equation}
+
+\begin{equation}
+    Y(t) = Y_A + k_S \cdot \Delta U \cdot Y_{\text{norm}}(t)
+    \label{eq:YSprung}
+\end{equation}
+
+\section{Schritt 5 – Darstellungen der geladenen Sprungantwort und der berechneten Modellantworten}
+\label{sec:Schritt5}  % Leerzeichen nach Doppelpunkt im Label entfernt
+
+Es sind, in Abhängigkeit von den eingegebenen Werten der $PT_n$-Systeme, 1 bis 4 Sprungantworten zu berechnen.\\
+Für die Zeit $t$ nehme jeweils die über die Excel-Tabelle eingelesenen Zeitwerte.  % Tippfehler "Zeiwerte" korrigiert
+Wenn keine Excel-Datei eingelesen wurde, dann berechne die Sprungantworten von $t=0$ bis zum Endzeitpunkt $t_e$. Wähle $t_e$ als $t_e = t_0 + t_{99} \cdot T_S$ entsprechend der folgenden Tabelle~\ref{tab:99Prozent}.\\
+Wenn sich die eingegeben Totzeiten unterscheiden, gilt für  $t_e$ die Berechnung 
+$t_e = max(t0_i + t99_i · TS_i)$\\ %Rev. 1-4 Verdeutlichung.
+Wenn keine Excel Daten eingelesen sind, dann nehme 1000 Stützstellen für die Zeitachse, also $\Delta t = t_e/1000$ \\ %Rev 1-3, Anzahl der Stützstellen festlegen.
+
+\begin{table}[H]
+    \centering
+    \begin{tabular}{|c|c|}
+      \hline
+         Systemordnung $n$ & Zeit $t_{99}$  \\
+         \hline
+        1  & 4.6060  \\
+         \hline
+        2  & 6.6400  \\
+         \hline
+        3  & 8.4060  \\
+         \hline
+        4  & 10.046  \\
+         \hline
+        5  & 11.6060  \\
+         \hline
+        6  & 13.1100  \\
+         \hline
+        7  & 14.5720  \\
+         \hline
+        8  & 16.0000  \\
+         \hline
+        9  & 17.4040  \\
+         \hline
+        10 & 18.7840  \\
+         \hline
+    \end{tabular}
+    \caption{Zeiten für 99\,\% des Endwertes in Vielfachen der Zeitkonstante}
+    \label{tab:99Prozent}
+\end{table}
+
+Berechne die Sprungantworten entsprechend den Gleichungen~\ref{eq:Ynorm} und~\ref{eq:YSprung} für alle eingegebenen Systeme.\\
+Wenn mehrere Systeme eingegeben werden und kein Excel-File eingelesen wurde, dann gilt für $t_e$: $t_e = \max(t_{e1},\, t_{e2},\, t_{e3},\, t_{e4})$.  % Tippfehler "eingelesenm" korrigiert
+
+Die Sprungantworten werden jeweils nach Auswahl der angewählten Klickfelder  % Tippfehler "klickfdelder" korrigiert
+zusammen mit der über Excel eingelesenen Sprungantwort in der rechten Hälfte der Webseite dargestellt.\\
+Wenn kein Excel-File geladen ist, werden nur die berechneten Sprungantworten dargestellt.\\
+\subsection{Darstellung der Abweichungen zwischen Messung und Modell im unteren Diagramm}
+Messungen werden über das Excelfile eingelesen. Seien die Meßwerte mit $Y_{Mess}$ bezeichnet.\\ % Rev. V1.3, $Y_Mess$ abgewandelt in $Y_{Mess}, 2 mal$
+$PT_n$-Modelle werden über die eingegebenen Daten berechnet.  Seien die Modellantworten mit $Y_i(t_k)$ bezeichnet und der Endzeitpunkt  mit $t_e$, sowie die Anzahl der 
+Messungen mit N, so dass also $N*\Delta t= t_e$ gilt.\\
+Wenn ein excel File eingelesen wurde können die folgenden Werte zu jedem Zeitpunkt der eingelesenen Zeiten berechnet werden:
+\begin{itemize}
+    \item Abweichungen, $\Delta Y(t_k) = Y_{Mess}(t_k)-Y_i(t_k)$  %Rev. 1-3, \Delta Y eingeführt
+    \item Abweichungen quadriert $\Delta Y_{SQ}(t_k)=(Y_{Mess}(t_k)-Y_i(t_k))^2$
+    \item Summe über alle quadrierten Abweichungen $YSQ_{Sum}(t_l)=\sum_{k=1}^{l} \Delta Y_{SQ}(t_k)* \Delta t$ %Rev. v1.3, Y{SQ} nach Y_{SQ}, *dt nach * \Delta t
+    \item Endwert der Summe $YSQ_{Sum}(t_e)=\sum_{k=1}^{N} \Delta Y_{SQ}(t_k)* \Delta t$
+\end{itemize}
+Im unteren Diagramm sollen 4 verschiedene Darstellungen möglich sein:\\
+\begin{itemize}
+    \item eingelesene Daten der Stellgröße aus dem Excelfile, soweit vorhanden und die Stellverläufe die sich aus den Eingabedaten ergeben, soweit das System in der tickbox angewählt ist. Bei 4 aktiven, ausgewählten Systemen mit verschiedenen UA/DU-Werten entstehen bis zu 4 Stufenfunktionen plus ggf. die Excel-Stellgröße. Das können 5 Kurven im unteren Diagramm sein. %Rev 1-4, Verdeutlichung
+    \item $\Delta Y_i(t_k)$, Abweichungen zwischen dem eingelesenen System und dem oder den, über die Tickboxen ausgewählten Systemen, $1 \le i \le 4$
+    \item Abweichungen quadr. $\Delta Y_{SQ}(t_k)$, für die über die Tickboxen ausgewählten Systeme
+    \item Summe über die quadrierten Abweichungen, $YSQ_{Sum}(t_k)$
+    
+\end{itemize}
+\section{Schritt 6 – Ausgabeseite zur Überprüfung der Berechnungen}
+\label{sec:Schritt6}  % Leerzeichen aus Label entfernt
+Um die Berechnungen überprüfen zu können, sollen die Eingabewerte und die berechneten Werte  % Tippfehler "uns" -> "und" korrigiert
+auf einer eigenen Webseite dargestellt werden.\\ 
+Es soll eine separate Seite sein, die sich öffnet, wenn das entsprechende Klickfeld angewählt wird. Wenn auf dieser Seite ein entsprechendes Eingabefeld angewählt wird, wird diese Seite geschlossen und das Programm kehrt auf die Ausgabeseite zurück.\\ %Rev. 1-3, Verdeutlichen was gemeint ist.
+Liste der ausgegebenen Werte entsprechend den zuvor vergebenen Namen. Bitte immer die Namen und Werte einander nahe zugeordnet ausgeben.\\
+\begin{enumerate}
+    \item System 1: Systemname 1, $t_{01}$, YA1, UA1, DU1, kS1, n1, TS1, $YSQ_{Sum}$
+    \item System 2: Systemname 2, $t_{02}$, YA2, UA2, DU2, kS2, n2, TS2, $YSQ_{Sum}$
+    \item System 3: Systemname 3, $t_{03}$, YA3, UA3, DU3, kS3, n3, TS3, $YSQ_{Sum}$
+    \item System 4: Systemname 4, $t_{04}$, YA4, UA4, DU4, kS4, n4, TS4, $YSQ_{Sum}$
+\end{enumerate}
+$YSQ_{Sum}$ wird pro System aufgelistet. Dieser Wert existiert nur, wenn ein Excel-File geladen ist. Wenn kein Excelfile geladen ist, soll das Feld leer bleiben / „–" anzeigen, 
+
+\end{document}
+

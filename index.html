@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>AGP·Control – PTn-System-Vergleich</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect x='1' y='1' width='30' height='30' rx='8' fill='%233949ab'/%3E%3Cpath d='M5 24 L11 24 L11 12 Q16 6 19 11 T25 10' fill='none' stroke='white' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3Cline x1='5' y1='10' x2='25' y2='10' stroke='%234dd0c4' stroke-width='1.4' stroke-dasharray='2 2'/%3E%3C/svg%3E" />
+  <script src="https://cdn.plot.ly/plotly-2.32.0.min.js"></script>
+  <link rel="stylesheet" href="/static/agp-design-system.css" />
+  <link rel="stylesheet" href="/static/app.css" />
+</head>
+<body class="agp-app">
+
+<header class="agp-header">
+  <div class="agp-brand">
+    <svg class="agp-brand__mark" viewBox="0 0 32 32" aria-hidden="true">
+      <rect x="1" y="1" width="30" height="30" rx="8" fill="rgba(255,255,255,.12)" stroke="rgba(255,255,255,.5)"/>
+      <path d="M5 24 L11 24 L11 12 Q16 6 19 11 T25 10" fill="none" stroke="#fff" stroke-width="2"
+            stroke-linecap="round" stroke-linejoin="round"/>
+      <line x1="5" y1="10" x2="25" y2="10" stroke="#4dd0c4" stroke-width="1.4" stroke-dasharray="2 2"/>
+    </svg>
+    <div class="agp-brand__word">AGP<b>·Control</b></div>
+  </div>
+  <div class="agp-header__sep"></div>
+  <div class="agp-header__title">PTn-System-Vergleich</div>
+  <button class="agp-btn agp-btn--ghost agp-btn--sm" onclick="ergebnisseZeigen()"
+          title="Kennwerte und Fehlerintegrale aller Systeme">Ergebnisse …</button>
+  <button class="agp-btn agp-btn--ghost agp-btn--sm" onclick="allesZuruecksetzen()"
+          title="Alle Systeme und geladene Messdaten zurücksetzen">↺ Zurücksetzen</button>
+  <div class="agp-header__spacer"></div>
+  <small class="agp-header__sys" id="sysName">Keine Messdaten geladen</small>
+  <span id="statusBadge" class="agp-badge is-err">Server offline</span>
+</header>
+
+<div class="agp-workspace">
+
+  <aside class="agp-panel" id="panel">
+    <!-- Systemkarten werden aus JS erzeugt -->
+
+    <div class="agp-card">
+      <div class="agp-card__head"><h3 class="agp-card__title">Referenzmessung laden</h3></div>
+      <input type="file" id="messInput" accept=".xlsx,.xlsm,.xls" hidden />
+      <button class="agp-btn agp-btn--secondary agp-btn--block" onclick="messInput.click()">
+        Datei laden
+      </button>
+      <div class="agp-hint" id="messInfo">
+        Excel-Messdaten (Zeit | y | u) oder eine AGP-Projektdatei.
+      </div>
+      <label class="agp-check" style="margin-top:6px">
+        <input type="checkbox" id="messZeigen" checked /> <span>Messung im Diagramm zeigen</span>
+      </label>
+      <div class="agp-msg agp-msg--err" id="messFehler" hidden></div>
+    </div>
+  </aside>
+
+  <section class="agp-output">
+    <div class="agp-card agp-chart-card">
+      <div class="agp-card__head"><h3 class="agp-card__title is-brand" id="plotTitel">PTn – Sprungantworten</h3></div>
+      <div id="plot" class="agp-chart"></div>
+    </div>
+  </section>
+
+</div>
+
+<!-- ══ Ergebnisseite ══ -->
+<div id="ergebnisseite" class="pruefseite" hidden>
+  <div class="pruefseite__kopf">
+    <h2>Ergebnisse des Vergleichs</h2>
+    <button class="agp-btn agp-btn--primary agp-btn--sm" onclick="ergebnisseSchliessen()">← Zurück</button>
+  </div>
+  <div id="ergebnisInhalt"></div>
+</div>
+
+<script>
+// ══ Zustand ═══════════════════════════════════════════════════════════════
+const ANZAHL = 4;
+const FARBEN = ['#1976d2', '#e53935', '#43a047', '#fb8c00'];
+
+const S = {
+  systeme: Array.from({ length: ANZAHL }, (_, i) => ({
+    name: `System ${i + 1}`, YA: '', t0: '', UA: '', DU: '', KS: '', n: '', TS: '',
+    aktiv: i === 0,
+  })),
+  mess: null,
+  erg: null,
+};
+
+const $ = (id) => document.getElementById(id);
+const fmt = (v, n = 4) => (v === null || v === undefined || !isFinite(v)) ? '–' : Number(v).toFixed(n);
+const zahlOderNull = (s) => { const v = parseFloat(s); return isFinite(v) ? v : null; };
+
+// ══ Systemkarten aufbauen ═════════════════════════════════════════════════
+function karten() {
+  const felder = [
+    ['YA', 'Ausgangsgröße vor dem Sprung'],
+    ['t0', 'Zeitpunkt des Sprungs'],
+    ['UA', 'Stellgröße vor dem Sprung'],
+    ['DU', 'Sprunghöhe der Stellgröße'],
+    ['KS', 'Streckenverstärkung'],
+    ['n', 'Modellordnung (1…10)'],
+    ['TS', 'Zeitkonstante'],
+  ];
+  const html = S.systeme.map((sys, i) => `
+    <div class="agp-card sys-karte" data-sys="${i}" style="border-left:4px solid ${FARBEN[i]}">
+      <div class="sys-kopf">
+        <input type="checkbox" id="aktiv${i}" ${sys.aktiv ? 'checked' : ''}
+               title="System im Diagramm zeigen" />
+        <input class="agp-input sys-name" id="name${i}" value="${sys.name}"
+               title="Name des Teilnehmers/Systems" />
+        <button class="agp-btn agp-btn--ghost agp-btn--sm" onclick="modellLaden(${i})"
+                title="Teilnehmer-Projektdatei laden und Modell übernehmen">📂</button>
+      </div>
+      <div class="sysraster">
+        ${felder.map(([f, tip]) => `
+          <label for="${f}${i}" title="${tip}">${f === 't0' ? 't₀' : f}</label>
+          <input class="agp-input" type="number" step="any" id="${f}${i}" value="${sys[f]}" />
+        `).join('')}
+      </div>
+      <div class="agp-hint sys-fehler" id="fehler${i}"></div>
+    </div>`).join('');
+  $('panel').insertAdjacentHTML('afterbegin', html);
+
+  for (let i = 0; i < ANZAHL; i++) {
+    $(`aktiv${i}`).addEventListener('change', () => {
+      S.systeme[i].aktiv = $(`aktiv${i}`).checked;
+      rechnen();
+    });
+    $(`name${i}`).addEventListener('input', () => {
+      S.systeme[i].name = $(`name${i}`).value;
+      rechnenVerzoegert();
+    });
+    for (const [f] of felder) {
+      $(`${f}${i}`).addEventListener('input', () => {
+        S.systeme[i][f] = $(`${f}${i}`).value;
+        rechnenVerzoegert();
+      });
+    }
+  }
+}
+
+// ══ Server ════════════════════════════════════════════════════════════════
+function alsAnfrage(sys, aktiv) {
+  return {
+    name: sys.name, aktiv,
+    y_a: zahlOderNull(sys.YA), t0: zahlOderNull(sys.t0),
+    u_a: zahlOderNull(sys.UA), d_u: zahlOderNull(sys.DU),
+    k_s: zahlOderNull(sys.KS), n: zahlOderNull(sys.n), T_s: zahlOderNull(sys.TS),
+  };
+}
+
+async function rechnen() {
+  try {
+    const r = await fetch('/api/vergleich', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        systeme: S.systeme.map(s => alsAnfrage(s, s.aktiv)),
+        zeit_daten: S.mess ? S.mess.zeit : null,
+        mess_daten: S.mess ? S.mess.y_daten : null,
+      }),
+    });
+    if (!r.ok) throw new Error(await r.text());
+    S.erg = await r.json();
+    statusSetzen(true);
+  } catch (e) {
+    S.erg = null;
+    statusSetzen(false);
+  }
+  hinweiseAnzeigen();
+  zeichnen();
+}
+
+let timer = null;
+function rechnenVerzoegert() { clearTimeout(timer); timer = setTimeout(rechnen, 150); }
+
+function statusSetzen(ok) {
+  const b = $('statusBadge');
+  b.textContent = ok ? 'Server bereit' : 'Server offline';
+  b.className = 'agp-badge ' + (ok ? 'is-ok' : 'is-err');
+}
+
+/** Zeigt je System, warum es (noch) nicht gezeichnet wird. */
+function hinweiseAnzeigen() {
+  const gezeichnet = new Set((S.erg && S.erg.kurven || []).map(k => k.index));
+  for (let i = 0; i < ANZAHL; i++) {
+    const el = $(`fehler${i}`);
+    if (!S.systeme[i].aktiv) { el.textContent = 'abgeschaltet'; continue; }
+    if (gezeichnet.has(i)) { el.textContent = ''; continue; }
+    const s = S.systeme[i];
+    const fehlt = ['YA', 't0', 'DU', 'KS', 'n', 'TS'].filter(f => zahlOderNull(s[f]) === null);
+    if (fehlt.length) { el.textContent = 'unvollständig: ' + fehlt.join(', '); continue; }
+    const n = zahlOderNull(s.n);
+    if (n === null || n < 1 || n > 10) { el.textContent = 'n muss zwischen 1 und 10 liegen'; continue; }
+    if (zahlOderNull(s.TS) <= 0) { el.textContent = 'TS muss größer 0 sein'; continue; }
+    if (zahlOderNull(s.DU) === 0 || zahlOderNull(s.KS) === 0) {
+      el.textContent = 'DU und KS dürfen nicht 0 sein'; continue;
+    }
+    el.textContent = '';
+  }
+}
+
+// ══ Diagramm ══════════════════════════════════════════════════════════════
+function zeichnen() {
+  const div = $('plot');
+  const e = S.erg;
+  const messZeigen = $('messZeigen').checked && !!S.mess;
+  const hatKurven = !!(e && e.zeit && e.zeit.length);
+
+  // Zeitachse: Messung hat Vorrang, damit sie auch ohne Modelle sichtbar ist
+  const t = S.mess ? S.mess.zeit : (hatKurven ? e.zeit : []);
+  if (t.length === 0) { Plotly.purge(div); return; }
+
+  const vn = S.mess ? S.mess.var_namen : { zeit: 'Zeit', y: 'y', u: 'u' };
+  const traces = [];
+
+  if (messZeigen) {
+    traces.push({
+      x: t, y: S.mess.y_daten, mode: 'lines', name: 'Messung ' + vn.y,
+      line: { width: 3, color: '#555' },
+    });
+  }
+  if (hatKurven) {
+    for (const k of e.kurven) {
+      traces.push({
+        x: e.zeit, y: k.daten, mode: 'lines', name: k.name,
+        line: { width: 2, color: FARBEN[k.index], dash: 'dot' },
+      });
+    }
+  }
+
+  Plotly.purge(div);
+  Plotly.newPlot(div, traces, {
+    xaxis: { title: { text: vn.zeit } },
+    yaxis: { title: { text: vn.y || 'Ausgangsgröße' } },
+    margin: { t: 20, r: 20, b: 40, l: 60 },
+    autosize: true, hovermode: 'closest',
+  }, { responsive: true });
+
+  $('plotTitel').textContent = S.mess
+    ? (S.mess.dateiname || 'PTn – Sprungantworten')
+    : 'PTn – Sprungantworten (keine Messung)';
+}
+
+// ══ Ergebnisseite ═════════════════════════════════════════════════════════
+function ergebnisseZeigen() {
+  const e = S.erg;
+  const hatMess = !!S.mess;
+  const zeilen = S.systeme.map((s, i) => {
+    const gezeichnet = (e && e.kurven || []).some(k => k.index === i);
+    const fi = e && e.fehlerintegral ? e.fehlerintegral[i] : null;
+    return { i, s, gezeichnet, fi };
+  });
+  // Rang nach Fehlerintegral, nur für gerechnete Systeme
+  const bewertet = zeilen.filter(z => z.fi !== null && z.fi !== undefined)
+                         .sort((a, b) => a.fi - b.fi);
+  const rang = new Map(bewertet.map((z, k) => [z.i, k + 1]));
+
+  const kopf = `<tr><th>Rang</th><th>System</th><th>KS</th><th>n</th><th>TS</th>
+                <th>Fehlerintegral Σ Δy²·Δt</th><th>Status</th></tr>`;
+  const koerper = zeilen.map(({ i, s, gezeichnet, fi }) => `
+    <tr>
+      <td>${rang.get(i) ? '<b>' + rang.get(i) + '</b>' : '–'}</td>
+      <td><span class="farbpunkt" style="background:${FARBEN[i]}"></span>${s.name || 'System ' + (i + 1)}</td>
+      <td>${s.KS || '–'}</td><td>${s.n || '–'}</td><td>${s.TS || '–'}</td>
+      <td>${fi === null || fi === undefined ? '–' : fmt(fi, 6)}</td>
+      <td>${!s.aktiv ? 'abgeschaltet' : (gezeichnet ? 'gerechnet' : 'unvollständig')}</td>
+    </tr>`).join('');
+
+  $('ergebnisInhalt').innerHTML = `
+    ${hatMess ? '' : '<div class="agp-msg agp-msg--warn">Ohne Referenzmessung gibt es kein Fehlerintegral – es werden nur die Modellwerte gezeigt.</div>'}
+    <table class="ergebnis">${kopf}${koerper}</table>
+    <p class="agp-hint">Das Fehlerintegral misst die Abweichung zwischen Modell und
+    Messung über die gesamte Zeit. Kleiner ist besser; Rang 1 trifft die Messung am besten.</p>`;
+  $('ergebnisseite').hidden = false;
+}
+function ergebnisseSchliessen() { $('ergebnisseite').hidden = true; }
+
+document.addEventListener('keydown', (ev) => {
+  if (ev.key === 'Escape' && !$('ergebnisseite').hidden) ergebnisseSchliessen();
+});
+
+// ══ Dateien laden ═════════════════════════════════════════════════════════
+
+/** 📂 je System: Teilnehmer-Projektdatei laden und Modell übernehmen */
+function modellLaden(i) {
+  const feld = document.createElement('input');
+  feld.type = 'file';
+  feld.accept = '.xlsx,.xlsm,.xls';
+  feld.addEventListener('change', async () => {
+    const datei = feld.files && feld.files[0];
+    if (!datei) return;
+    const fd = new FormData();
+    fd.append('datei', datei);
+    try {
+      const r = await fetch('/api/datei_laden', { method: 'POST', body: fd });
+      const antwort = await r.json();
+      if (!r.ok) throw new Error(antwort.detail || 'Datei konnte nicht gelesen werden');
+      if (antwort.art !== 'projekt') {
+        throw new Error('Das ist keine AGP-Projektdatei. Für Rohmessungen bitte '
+                      + '„Referenzmessung laden" verwenden.');
+      }
+      if (!antwort.modell) {
+        throw new Error('Die Projektdatei enthält kein PTn-Modell '
+                      + '(PT1TT-Modelle werden hier nicht verglichen).');
+      }
+      uebernehmen(i, antwort);
+      $(`fehler${i}`).textContent = '';
+    } catch (e) {
+      $(`fehler${i}`).textContent = e.message;
+    }
+  });
+  feld.click();
+}
+
+/** Modell- und Signalwerte aus einer Projektdatei in ein System schreiben */
+function uebernehmen(i, antwort) {
+  const m = antwort.modell;
+  const s = S.systeme[i];
+  s.name = m.name || antwort.fallname || s.name;
+  s.KS = String(m.k_s);
+  s.n = String(m.n);
+  s.TS = String(m.T_s);
+
+  // Signalwerte: aus der Datei, sonst von einem bereits gefüllten System
+  let sig = antwort.signalwerte;
+  if (!sig) {
+    const vorbild = S.systeme.find((o, k) => k !== i && o.YA !== '' && o.DU !== '');
+    if (vorbild) sig = { y_a: +vorbild.YA, t0: +vorbild.t0, u_a: +vorbild.UA, d_u: +vorbild.DU };
+  }
+  if (sig) {
+    s.YA = String(sig.y_a); s.t0 = String(sig.t0);
+    s.UA = String(sig.u_a); s.DU = String(sig.d_u);
+  }
+  s.aktiv = true;
+
+  // Felder nachziehen
+  $(`name${i}`).value = s.name;
+  for (const f of ['YA', 't0', 'UA', 'DU', 'KS', 'n', 'TS']) $(`${f}${i}`).value = s[f];
+  $(`aktiv${i}`).checked = true;
+
+  // Bringt die Datei Zeitverläufe mit und es gibt noch keine Messung: übernehmen
+  if (antwort.messung && !S.mess) messungSetzen(antwort.messung);
+  rechnen();
+}
+
+function messungSetzen(messung) {
+  S.mess = messung;
+  $('sysName').textContent = messung.systemname || messung.dateiname || 'Messdaten geladen';
+  $('messInfo').textContent = `${messung.dateiname || 'Projektdatei'} – ${messung.zeit.length} Messpunkte`;
+}
+
+$('messInput').addEventListener('change', async (ev) => {
+  const datei = ev.target.files && ev.target.files[0];
+  if (!datei) return;
+  const fd = new FormData();
+  fd.append('datei', datei);
+  $('messFehler').hidden = true;
+  try {
+    const r = await fetch('/api/datei_laden', { method: 'POST', body: fd });
+    const antwort = await r.json();
+    if (!r.ok) throw new Error(antwort.detail || 'Datei konnte nicht gelesen werden');
+    if (!antwort.messung) {
+      throw new Error('Die Datei enthält keine Zeitverläufe.');
+    }
+    messungSetzen(antwort.messung);
+    rechnen();
+  } catch (e) {
+    $('messFehler').textContent = e.message;
+    $('messFehler').hidden = false;
+  } finally {
+    ev.target.value = '';
+  }
+});
+
+$('messZeigen').addEventListener('change', zeichnen);
+
+function allesZuruecksetzen() {
+  S.mess = null;
+  S.erg = null;
+  for (let i = 0; i < ANZAHL; i++) {
+    S.systeme[i] = { name: `System ${i + 1}`, YA: '', t0: '', UA: '', DU: '',
+                     KS: '', n: '', TS: '', aktiv: i === 0 };
+    $(`name${i}`).value = S.systeme[i].name;
+    for (const f of ['YA', 't0', 'UA', 'DU', 'KS', 'n', 'TS']) $(`${f}${i}`).value = '';
+    $(`aktiv${i}`).checked = i === 0;
+    $(`fehler${i}`).textContent = '';
+  }
+  $('sysName').textContent = 'Keine Messdaten geladen';
+  $('messInfo').textContent = 'Excel-Messdaten (Zeit | y | u) oder eine AGP-Projektdatei.';
+  $('messFehler').hidden = true;
+  rechnen();
+}
+
+// ══ Start ═════════════════════════════════════════════════════════════════
+karten();
+(async function start() {
+  try {
+    const r = await fetch('/api/health');
+    statusSetzen(r.ok);
+  } catch { statusSetzen(false); }
+  rechnen();
+})();
+
+window.addEventListener('resize', () => {
+  const div = $('plot');
+  if (div && div.data) Plotly.Plots.resize(div);
+});
+</script>
+</body>
+</html>

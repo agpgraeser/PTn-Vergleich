@@ -1,0 +1,111 @@
+/* app.css – App-Spezifisches zum PTn-System-Vergleich.
+   Alles Gemeinsame kommt aus agp-design-system.css (Master:
+   F:\Dropbox\1_a_a_WebApp\_AGP-DesignSystem\). */
+
+/* Plotly ist noch nicht dark-mode-tauglich – Seite hell pinnen
+   (gleiche Entscheidung wie in RegelkreisSimulationen und PTn-ZPK). */
+:root { color-scheme: light; }
+
+/* Panelbreite fest wie in der Vorgaenger-App (App.tsx: '400px 1fr').
+   Anteilige Breiten machen die Eingaberaster kaputt. */
+.agp-workspace { grid-template-columns: 400px 1fr; }
+@media (max-width: 860px) {
+  .agp-workspace { grid-template-columns: 1fr; }
+}
+
+.agp-panel { gap: 10px; }
+.agp-panel .agp-card { padding: 10px 12px 12px; }
+
+/* ── Systemkarte ───────────────────────────────────────────────────────── */
+
+.sys-kopf {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+.sys-kopf input.sys-name {
+  flex: 1;
+  min-width: 0;
+  font-weight: 600;
+  font-size: 13px;
+  padding: 3px 6px;
+}
+
+/* Label | Feld | Label | Feld – zwei Paare je Zeile, feste Feldbreite,
+   damit die Spalten ueber alle Systeme fluchten (Vorbild: row4 im Original) */
+.sysraster {
+  display: grid;
+  grid-template-columns: max-content 80px max-content 80px;
+  column-gap: 6px;
+  row-gap: 4px;
+  align-items: center;
+}
+.sysraster > label {
+  font-size: 12px;
+  color: var(--agp-muted, #555);
+  white-space: nowrap;
+  margin: 0;
+}
+.sysraster input {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  padding: 3px 6px;
+  font-size: 12px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Hinweis, warum ein System (noch) nicht gezeichnet wird */
+.sys-fehler { margin-top: 6px; min-height: 14px; color: #b26a00; }
+.sys-fehler:empty { min-height: 0; }
+
+/* ── Ergebnisseite ─────────────────────────────────────────────────────── */
+.pruefseite {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  overflow-y: auto;
+  padding: 16px;
+  background: var(--agp-bg, #f5f5f5);
+}
+.pruefseite__kopf {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+.pruefseite__kopf h2 { margin: 0; font-size: 18px; font-weight: 700; }
+
+table.ergebnis {
+  border-collapse: collapse;
+  width: 100%;
+  max-width: 1000px;
+  background: var(--agp-surface, #fff);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+table.ergebnis th,
+table.ergebnis td {
+  border: 1px solid var(--agp-border, #ddd);
+  padding: 5px 8px;
+  text-align: right;
+}
+table.ergebnis th { background: var(--agp-surface-2, #f0f0f0); font-weight: 600; }
+table.ergebnis th:nth-child(2),
+table.ergebnis td:nth-child(2),
+table.ergebnis th:last-child,
+table.ergebnis td:last-child { text-align: left; }
+
+/* Farbpunkt in der Namensspalte – gleiche Farbe wie die Kurve im Diagramm */
+.farbpunkt {
+  display: inline-block;
+  width: 10px; height: 10px;
+  border-radius: 50%;
+  margin-right: 6px;
+  vertical-align: baseline;
+}
+
+/* ── Diagramm ──────────────────────────────────────────────────────────── */
+#plot { min-height: 480px; }
