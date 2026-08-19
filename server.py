@@ -53,6 +53,7 @@ class SystemEingabe(BaseModel):
     k_s: float | None = None
     n: float | None = None
     T_s: float | None = None
+    T_t: float | None = None          # Totzeit (neu, >= 0; None/0 = reines PTn)
     aktiv: bool = True
 
 

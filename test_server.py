@@ -92,6 +92,18 @@ def test_vergleich_mit_messung_liefert_fehlerintegral():
     assert e["zeit"] == pytest.approx(zeit.tolist())
 
 
+def test_vergleich_mit_totzeit():
+    """PTnTT ueber die API: vor t0+T_t ist die Kurve 0, danach steigt sie."""
+    r = client.post("/api/vergleich", json={
+        "systeme": [{**sys_(name="mitTt", t0=0.0, T_s=1.0, n=3), "T_t": 5.0}]})
+    assert r.status_code == 200
+    e = r.json()
+    zeit = np.asarray(e["zeit"])
+    daten = np.asarray(e["kurven"][0]["daten"])
+    assert np.allclose(daten[zeit <= 5.0], 0.0, atol=1e-9)
+    assert zeit[-1] > 5.0 and daten[-1] > 0.5
+
+
 # ── Dateien laden ───────────────────────────────────────────────────────────
 
 def test_datei_laden_erkennt_rohmessung():

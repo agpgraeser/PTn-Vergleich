@@ -54,9 +54,23 @@
   </aside>
 
   <section class="agp-output">
-    <div class="agp-card agp-chart-card">
+    <div class="agp-card agp-chart-card chart-oben">
       <div class="agp-card__head"><h3 class="agp-card__title is-brand" id="plotTitel">PTn – Sprungantworten</h3></div>
       <div id="plot" class="agp-chart"></div>
+    </div>
+
+    <div class="untermodus">
+      <span class="untermodus__label">Unteres Diagramm:</span>
+      <div class="untermodus__gruppe" id="untenModi">
+        <button class="untermodus__btn is-aktiv" data-m="1" onclick="untenSetzen(1)">1 · Stellgröße</button>
+        <button class="untermodus__btn" data-m="2" onclick="untenSetzen(2)">2 · Abweichung</button>
+        <button class="untermodus__btn" data-m="3" onclick="untenSetzen(3)">3 · Quadr. Abw.</button>
+        <button class="untermodus__btn" data-m="4" onclick="untenSetzen(4)">4 · Σe²·Δt</button>
+      </div>
+    </div>
+
+    <div class="agp-card agp-chart-card chart-unten">
+      <div id="plotUnten" class="agp-chart"></div>
     </div>
   </section>
 
@@ -76,14 +90,19 @@
 const ANZAHL = 4;
 const FARBEN = ['#1976d2', '#e53935', '#43a047', '#fb8c00'];
 
+// Alle Eingabefelder eines Systems (Reihenfolge egal – nur fuers Verdrahten)
+const FELDER = ['YA', 't0', 'UA', 'DU', 'KS', 'TS', 'TT', 'n'];
+
 const S = {
   systeme: Array.from({ length: ANZAHL }, (_, i) => ({
-    name: `System ${i + 1}`, YA: '', t0: '', UA: '', DU: '', KS: '', n: '', TS: '',
+    name: `System ${i + 1}`, YA: '', t0: '', UA: '', DU: '', KS: '', TS: '', TT: '', n: '',
     aktiv: i === 0,
   })),
   mess: null,
   erg: null,
 };
+
+let untenModus = 1;   // 1 Stellgröße · 2 Abweichung · 3 Quadr.Abw. · 4 Σe²·Δt
 
 const $ = (id) => document.getElementById(id);
 const fmt = (v, n = 4) => (v === null || v === undefined || !isFinite(v)) ? '–' : Number(v).toFixed(n);
@@ -91,34 +110,43 @@ const zahlOderNull = (s) => { const v = parseFloat(s); return isFinite(v) ? v : 
 
 // ══ Systemkarten aufbauen ═════════════════════════════════════════════════
 function karten() {
-  const felder = [
-    ['YA', 'Ausgangsgröße vor dem Sprung'],
-    ['t0', 'Zeitpunkt des Sprungs'],
-    ['UA', 'Stellgröße vor dem Sprung'],
-    ['DU', 'Sprunghöhe der Stellgröße'],
-    ['KS', 'Streckenverstärkung'],
-    ['n', 'Modellordnung (1…10)'],
-    ['TS', 'Zeitkonstante'],
-  ];
+  const feld = (id, label, tip) =>
+    `<label for="${id}" title="${tip}">${label}</label>
+     <input class="agp-input" type="number" step="any" id="${id}" value="" />`;
+
   const html = S.systeme.map((sys, i) => `
     <div class="agp-card sys-karte" data-sys="${i}" style="border-left:4px solid ${FARBEN[i]}">
       <div class="sys-kopf">
         <input type="checkbox" id="aktiv${i}" ${sys.aktiv ? 'checked' : ''}
                title="System im Diagramm zeigen" />
-        <input class="agp-input sys-name" id="name${i}" value="${sys.name}"
-               title="Name des Teilnehmers/Systems" />
+        <span class="sys-status" id="fehler${i}"></span>
+        <input class="agp-input sys-name" id="name${i}" value="${sys.name}" maxlength="10"
+               title="Name des Teilnehmers/Systems (max. 10 Zeichen)" />
         <button class="agp-btn agp-btn--ghost agp-btn--sm" onclick="modellLaden(${i})"
                 title="Teilnehmer-Projektdatei laden und Modell übernehmen">📂</button>
       </div>
       <div class="sysraster">
-        ${felder.map(([f, tip]) => `
-          <label for="${f}${i}" title="${tip}">${f === 't0' ? 't₀' : f}</label>
-          <input class="agp-input" type="number" step="any" id="${f}${i}" value="${sys[f]}" />
-        `).join('')}
+        ${feld(`YA${i}`, 'YA', 'Ausgangsgröße vor dem Sprung')}
+        ${feld(`t0${i}`, 't₀', 'Zeitpunkt des Sprungs')}
       </div>
-      <div class="agp-hint sys-fehler" id="fehler${i}"></div>
+      <div class="sysraster">
+        ${feld(`UA${i}`, 'UA', 'Stellgröße vor dem Sprung')}
+        ${feld(`DU${i}`, 'DU', 'Sprunghöhe der Stellgröße')}
+      </div>
+      <div class="sysraster sysraster--vier">
+        ${feld(`KS${i}`, 'KS', 'Streckenverstärkung')}
+        ${feld(`TS${i}`, 'TS', 'Zeitkonstante')}
+        ${feld(`TT${i}`, 'TT', 'Totzeit (≥ 0)')}
+        <label for="n${i}" title="Modellordnung (1…10)">n</label>
+        <input class="agp-input feld-n" type="number" step="1" min="1" max="10" id="n${i}" value="" />
+      </div>
     </div>`).join('');
   $('panel').insertAdjacentHTML('afterbegin', html);
+
+  // Werte einsetzen (getrennt vom Template, damit leere Strings sauber bleiben)
+  for (let i = 0; i < ANZAHL; i++) {
+    for (const f of FELDER) $(`${f}${i}`).value = S.systeme[i][f];
+  }
 
   for (let i = 0; i < ANZAHL; i++) {
     $(`aktiv${i}`).addEventListener('change', () => {
@@ -129,7 +157,7 @@ function karten() {
       S.systeme[i].name = $(`name${i}`).value;
       rechnenVerzoegert();
     });
-    for (const [f] of felder) {
+    for (const f of FELDER) {
       $(`${f}${i}`).addEventListener('input', () => {
         S.systeme[i][f] = $(`${f}${i}`).value;
         rechnenVerzoegert();
@@ -145,6 +173,7 @@ function alsAnfrage(sys, aktiv) {
     y_a: zahlOderNull(sys.YA), t0: zahlOderNull(sys.t0),
     u_a: zahlOderNull(sys.UA), d_u: zahlOderNull(sys.DU),
     k_s: zahlOderNull(sys.KS), n: zahlOderNull(sys.n), T_s: zahlOderNull(sys.TS),
+    T_t: zahlOderNull(sys.TT),
   };
 }
 
@@ -179,36 +208,41 @@ function statusSetzen(ok) {
   b.className = 'agp-badge ' + (ok ? 'is-ok' : 'is-err');
 }
 
-/** Zeigt je System, warum es (noch) nicht gezeichnet wird. */
+/** Zeigt je System (in Zeile 1, rechts der Klickbox), warum es (noch) nicht
+ *  gezeichnet wird. Kurze Texte, damit die Kopfzeile schmal bleibt. */
 function hinweiseAnzeigen() {
   const gezeichnet = new Set((S.erg && S.erg.kurven || []).map(k => k.index));
   for (let i = 0; i < ANZAHL; i++) {
     const el = $(`fehler${i}`);
-    if (!S.systeme[i].aktiv) { el.textContent = 'abgeschaltet'; continue; }
-    if (gezeichnet.has(i)) { el.textContent = ''; continue; }
+    if (!S.systeme[i].aktiv) { el.textContent = 'aus'; el.title = 'abgeschaltet'; continue; }
+    if (gezeichnet.has(i)) { el.textContent = ''; el.title = ''; continue; }
     const s = S.systeme[i];
     const fehlt = ['YA', 't0', 'DU', 'KS', 'n', 'TS'].filter(f => zahlOderNull(s[f]) === null);
-    if (fehlt.length) { el.textContent = 'unvollständig: ' + fehlt.join(', '); continue; }
+    if (fehlt.length) { setStatus(el, 'unvollständig: ' + fehlt.join(', ')); continue; }
     const n = zahlOderNull(s.n);
-    if (n === null || n < 1 || n > 10) { el.textContent = 'n muss zwischen 1 und 10 liegen'; continue; }
-    if (zahlOderNull(s.TS) <= 0) { el.textContent = 'TS muss größer 0 sein'; continue; }
-    if (zahlOderNull(s.DU) === 0 || zahlOderNull(s.KS) === 0) {
-      el.textContent = 'DU und KS dürfen nicht 0 sein'; continue;
-    }
-    el.textContent = '';
+    if (n === null || n < 1 || n > 10) { setStatus(el, 'n muss 1…10 sein'); continue; }
+    if (zahlOderNull(s.TS) <= 0) { setStatus(el, 'TS muss > 0 sein'); continue; }
+    if (zahlOderNull(s.TT) !== null && zahlOderNull(s.TT) < 0) { setStatus(el, 'TT darf nicht < 0 sein'); continue; }
+    if (zahlOderNull(s.DU) === 0 || zahlOderNull(s.KS) === 0) { setStatus(el, 'DU und KS ≠ 0'); continue; }
+    setStatus(el, '');
   }
 }
+function setStatus(el, text) { el.textContent = text; el.title = text; }
 
-// ══ Diagramm ══════════════════════════════════════════════════════════════
+// ══ Diagramme ═════════════════════════════════════════════════════════════
 function zeichnen() {
+  zeichnenOben();
+  zeichnenUnten();
+}
+
+function zeichnenOben() {
   const div = $('plot');
   const e = S.erg;
   const messZeigen = $('messZeigen').checked && !!S.mess;
   const hatKurven = !!(e && e.zeit && e.zeit.length);
 
-  // Zeitachse: Messung hat Vorrang, damit sie auch ohne Modelle sichtbar ist
   const t = S.mess ? S.mess.zeit : (hatKurven ? e.zeit : []);
-  if (t.length === 0) { Plotly.purge(div); return; }
+  if (t.length === 0) { Plotly.purge(div); $('plotTitel').textContent = 'PTn – Sprungantworten'; return; }
 
   const vn = S.mess ? S.mess.var_namen : { zeit: 'Zeit', y: 'y', u: 'u' };
   const traces = [];
@@ -241,6 +275,95 @@ function zeichnen() {
     : 'PTn – Sprungantworten (keine Messung)';
 }
 
+const UNTEN_TITEL = {
+  1: 'Stellgröße', 2: 'Abweichung (Messung − Modell)',
+  3: 'Quadratische Abweichung', 4: 'Σ e²·Δt (laufendes Fehlerintegral)',
+};
+
+function untenSetzen(m) {
+  untenModus = m;
+  document.querySelectorAll('#untenModi .untermodus__btn')
+    .forEach(b => b.classList.toggle('is-aktiv', Number(b.dataset.m) === m));
+  zeichnenUnten();
+}
+
+/** Unteres Diagramm: 1 Stellgröße · 2 Abweichung · 3 Quadr.Abw. · 4 Σe²·Δt.
+ *  Die Abweichungsmodi brauchen eine geladene Messung; sie zeigen den
+ *  Unterschied zwischen Messung und jedem eingegebenen System. */
+function zeichnenUnten() {
+  const div = $('plotUnten');
+  const e = S.erg;
+  const hatModelle = !!(e && e.kurven && e.kurven.length);
+  const hatMess = !!S.mess;
+  const vn = S.mess ? S.mess.var_namen : { zeit: 'Zeit', y: 'y', u: 'u' };
+  const modellZeit = (e && e.zeit && e.zeit.length) ? e.zeit : [];
+  let traces = [];
+  let yTitel = UNTEN_TITEL[untenModus];
+
+  if (untenModus === 1) {
+    // Stellgröße: Excel-u (grau) + berechnete Stellverläufe je aktivem System
+    yTitel = 'Stellgröße ' + (vn.u || 'u');
+    if (hatMess && S.mess.u_daten && S.mess.u_daten.length) {
+      traces.push({
+        x: S.mess.zeit, y: S.mess.u_daten, mode: 'lines',
+        name: 'Messung ' + (vn.u || 'u'), line: { width: 2, color: '#9e9e9e' },
+      });
+    }
+    const tAx = modellZeit.length ? modellZeit : (hatMess ? S.mess.zeit : []);
+    if (tAx.length) {
+      for (let i = 0; i < ANZAHL; i++) {
+        const s = S.systeme[i];
+        if (!s.aktiv) continue;
+        const UA = zahlOderNull(s.UA), DU = zahlOderNull(s.DU), t0 = zahlOderNull(s.t0);
+        if (UA === null || DU === null || t0 === null) continue;
+        traces.push({
+          x: tAx, y: tAx.map(tt => tt <= t0 ? UA : UA + DU), mode: 'lines',
+          name: 'u: ' + (s.name || `System ${i + 1}`),
+          line: { width: 2, color: FARBEN[i], dash: 'dash' },
+        });
+      }
+    }
+  } else {
+    // Abweichungsmodi: brauchen Messung UND gerechnete Modelle
+    if (!hatMess || !hatModelle) { Plotly.purge(div); return; }
+    const y = S.mess.y_daten;
+    const t = e.zeit;   // == Messzeit, weil bei geladener Messung deren Zeitachse benutzt wird
+    if (untenModus === 2) {
+      traces = e.kurven.map(k => ({
+        x: t, y: y.map((v, idx) => v - (k.daten[idx] ?? 0)), mode: 'lines',
+        name: k.name, line: { width: 2, color: FARBEN[k.index] },
+      }));
+    } else if (untenModus === 3) {
+      traces = e.kurven.map(k => ({
+        x: t, y: y.map((v, idx) => Math.pow(v - (k.daten[idx] ?? 0), 2)), mode: 'lines',
+        name: k.name, line: { width: 2, color: FARBEN[k.index] },
+      }));
+    } else {
+      traces = e.kurven.map(k => {
+        const cum = []; let acc = 0;
+        for (let idx = 0; idx < t.length; idx++) {
+          const dt = idx === 0 ? 0 : t[idx] - t[idx - 1];
+          const err = y[idx] - (k.daten[idx] ?? 0);
+          acc += err * err * dt;
+          cum.push(acc);
+        }
+        return { x: t, y: cum, mode: 'lines', name: k.name,
+                 line: { width: 2, color: FARBEN[k.index] } };
+      });
+    }
+  }
+
+  if (!traces.length) { Plotly.purge(div); return; }
+  Plotly.purge(div);
+  Plotly.newPlot(div, traces, {
+    xaxis: { title: { text: vn.zeit } },
+    yaxis: { title: { text: yTitel } },
+    margin: { t: 12, r: 20, b: 50, l: 60 },
+    autosize: true, hovermode: 'closest',
+    legend: { orientation: 'h', y: -0.28, x: 0 },
+  }, { responsive: true });
+}
+
 // ══ Ergebnisseite ═════════════════════════════════════════════════════════
 function ergebnisseZeigen() {
   const e = S.erg;
@@ -250,18 +373,18 @@ function ergebnisseZeigen() {
     const fi = e && e.fehlerintegral ? e.fehlerintegral[i] : null;
     return { i, s, gezeichnet, fi };
   });
-  // Rang nach Fehlerintegral, nur für gerechnete Systeme
   const bewertet = zeilen.filter(z => z.fi !== null && z.fi !== undefined)
                          .sort((a, b) => a.fi - b.fi);
   const rang = new Map(bewertet.map((z, k) => [z.i, k + 1]));
 
-  const kopf = `<tr><th>Rang</th><th>System</th><th>KS</th><th>n</th><th>TS</th>
+  const kopf = `<tr><th>Rang</th><th>System</th><th>KS</th><th>n</th><th>TS</th><th>TT</th>
                 <th>Fehlerintegral Σ Δy²·Δt</th><th>Status</th></tr>`;
   const koerper = zeilen.map(({ i, s, gezeichnet, fi }) => `
     <tr>
       <td>${rang.get(i) ? '<b>' + rang.get(i) + '</b>' : '–'}</td>
       <td><span class="farbpunkt" style="background:${FARBEN[i]}"></span>${s.name || 'System ' + (i + 1)}</td>
       <td>${s.KS || '–'}</td><td>${s.n || '–'}</td><td>${s.TS || '–'}</td>
+      <td>${s.TT === '' || s.TT === undefined ? '0' : s.TT}</td>
       <td>${fi === null || fi === undefined ? '–' : fmt(fi, 6)}</td>
       <td>${!s.aktiv ? 'abgeschaltet' : (gezeichnet ? 'gerechnet' : 'unvollständig')}</td>
     </tr>`).join('');
@@ -270,7 +393,8 @@ function ergebnisseZeigen() {
     ${hatMess ? '' : '<div class="agp-msg agp-msg--warn">Ohne Referenzmessung gibt es kein Fehlerintegral – es werden nur die Modellwerte gezeigt.</div>'}
     <table class="ergebnis">${kopf}${koerper}</table>
     <p class="agp-hint">Das Fehlerintegral misst die Abweichung zwischen Modell und
-    Messung über die gesamte Zeit. Kleiner ist besser; Rang 1 trifft die Messung am besten.</p>`;
+    Messung über die gesamte Zeit. Kleiner ist besser; Rang 1 trifft die Messung am besten.
+    TT = Totzeit (0 = reines PTn-System).</p>`;
   $('ergebnisseite').hidden = false;
 }
 function ergebnisseSchliessen() { $('ergebnisseite').hidden = true; }
@@ -304,9 +428,9 @@ function modellLaden(i) {
                       + '(PT1TT-Modelle werden hier nicht verglichen).');
       }
       uebernehmen(i, antwort);
-      $(`fehler${i}`).textContent = '';
+      setStatus($(`fehler${i}`), '');
     } catch (e) {
-      $(`fehler${i}`).textContent = e.message;
+      setStatus($(`fehler${i}`), e.message);
     }
   });
   feld.click();
@@ -316,12 +440,13 @@ function modellLaden(i) {
 function uebernehmen(i, antwort) {
   const m = antwort.modell;
   const s = S.systeme[i];
-  s.name = m.name || antwort.fallname || s.name;
+  s.name = (m.name || antwort.fallname || s.name).slice(0, 10);
   s.KS = String(m.k_s);
   s.n = String(m.n);
   s.TS = String(m.T_s);
+  // Projektdateien der Familie enthalten (noch) keine Totzeit -> 0 lassen
+  if (s.TT === '') s.TT = '';
 
-  // Signalwerte: aus der Datei, sonst von einem bereits gefüllten System
   let sig = antwort.signalwerte;
   if (!sig) {
     const vorbild = S.systeme.find((o, k) => k !== i && o.YA !== '' && o.DU !== '');
@@ -333,12 +458,10 @@ function uebernehmen(i, antwort) {
   }
   s.aktiv = true;
 
-  // Felder nachziehen
   $(`name${i}`).value = s.name;
-  for (const f of ['YA', 't0', 'UA', 'DU', 'KS', 'n', 'TS']) $(`${f}${i}`).value = s[f];
+  for (const f of FELDER) $(`${f}${i}`).value = s[f];
   $(`aktiv${i}`).checked = true;
 
-  // Bringt die Datei Zeitverläufe mit und es gibt noch keine Messung: übernehmen
   if (antwort.messung && !S.mess) messungSetzen(antwort.messung);
   rechnen();
 }
@@ -379,11 +502,11 @@ function allesZuruecksetzen() {
   S.erg = null;
   for (let i = 0; i < ANZAHL; i++) {
     S.systeme[i] = { name: `System ${i + 1}`, YA: '', t0: '', UA: '', DU: '',
-                     KS: '', n: '', TS: '', aktiv: i === 0 };
+                     KS: '', TS: '', TT: '', n: '', aktiv: i === 0 };
     $(`name${i}`).value = S.systeme[i].name;
-    for (const f of ['YA', 't0', 'UA', 'DU', 'KS', 'n', 'TS']) $(`${f}${i}`).value = '';
+    for (const f of FELDER) $(`${f}${i}`).value = '';
     $(`aktiv${i}`).checked = i === 0;
-    $(`fehler${i}`).textContent = '';
+    setStatus($(`fehler${i}`), '');
   }
   $('sysName').textContent = 'Keine Messdaten geladen';
   $('messInfo').textContent = 'Excel-Messdaten (Zeit | y | u) oder eine AGP-Projektdatei.';
@@ -402,8 +525,10 @@ karten();
 })();
 
 window.addEventListener('resize', () => {
-  const div = $('plot');
-  if (div && div.data) Plotly.Plots.resize(div);
+  for (const id of ['plot', 'plotUnten']) {
+    const div = $(id);
+    if (div && div.data) Plotly.Plots.resize(div);
+  }
 });
 </script>
 </body>
